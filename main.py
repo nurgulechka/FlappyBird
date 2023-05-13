@@ -19,8 +19,17 @@ SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 clicked = False
 gameOver = False
 
+
+pipe_dist = 130
+pipe_freq = 1500
+last_pip = pygame.time.get_ticks() - pipe_freq
+
 bird_images = [pygame.image.load(get_path('sprites/yellowbird-midflap.png')), pygame.image.load(get_path('sprites/yellowbird-upflap.png')),
 pygame.image.load(get_path('sprites/yellowbird-downflap.png'))]
+
+
+
+
 
 class Bird(pygame.sprite.Sprite):
     def __init__(self, x, y, images):
@@ -39,6 +48,7 @@ class Bird(pygame.sprite.Sprite):
         self.start = False
 
     def jump(self): 
+        if not gameOver:
             if (not self.start) and self.rect[1] > 0:
                 self.start = True
                 self.speed = -6
@@ -50,7 +60,7 @@ class Bird(pygame.sprite.Sprite):
             self.speed += 0.3
             if self.speed > 8:
                 self.speed = 8
-            if self.rect.bottom < 400:
+            if self.rect.bottom <= 400:
                 self.rect.y += int(self.speed)
                 #animate()
 
@@ -98,12 +108,41 @@ class Ground(pygame.sprite.Sprite):
             if self.rect.x < - 25:    
                 self.rect.x = 0
 
+
+    
+class Pipe(pygame.sprite.Sprite):
+    def __init__(self, x, y, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load(get_path('sprites/pipe-green.png'))
+        self.rect = self.image.get_rect()
+        if pos == 1:
+            self.image = pygame.transform.flip(self.image, False, True)
+            self.rect.bottomleft = [x, y - pipe_dist/2]
+        if pos == -1:
+            self.rect.topleft = [x, y + pipe_dist/2]
+    def update(self):
+        self.rect[0] -= SPEED
+        if self.rect.right < 0:
+            self.kill()
+
+
+def generatePipes():
+    top = random.randint()
+    bottom = random.randint()
+    #at the top now = time.time()
+    #in while loop
+    #if now - start > 3:
+        #obstacles.append(genObstacle())
+        #start = now
+
+
+
 ground = pygame.sprite.Group()
 ground.add(Ground())
-
+pipe = pygame.sprite.Group()
 bird = pygame.sprite.GroupSingle()
 bird.add(Bird(50, int(HEIGHT/2), bird_images))
-    
+
 
 while True:
     
@@ -114,16 +153,34 @@ while True:
             if event.key == pygame.K_SPACE and not gameOver:
                 clicked = True
                 bird.sprite.jump()
-                
+            
     BACKGROUND = pygame.image.load(get_path('sprites/background-day.png'))
     SCREEN.blit(BACKGROUND, (0, 0))
+     
+    
+    pipe.draw(SCREEN)
     bird.draw(SCREEN)
     bird.update()
-    ground.update()
     ground.draw(SCREEN)
+    ground.update()
 
+    if bird.sprite.rect.bottom >= 768 or bird.sprite.rect.top < 0: gameOver, flying = True, False
+    
+    if not gameOver and clicked:
+        time_now = pygame.time.get_ticks()
+        if time_now - last_pip > pipe_freq:
+            pipeheight = random.randint(-50, 50)
+            pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1))
+            pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1))
+            last_pip = time_now
+        pipe.update()
+                
+    
+    
+   
     ground_collision = pygame.sprite.spritecollide(bird.sprite, ground, False)
-    if ground_collision:
+    pipe_collision = pygame.sprite.spritecollide(bird.sprite, pipe, False)
+    if ground_collision or pipe_collision:
         gameOver = True
         
     clock.tick(FPS)
