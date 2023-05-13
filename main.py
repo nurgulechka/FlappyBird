@@ -90,13 +90,12 @@ class Bird(pygame.sprite.Sprite):
             else: self.start = False
             
     def update(self):
-    
         if clicked:
-            self.speed += 0.4
-            if self.speed > 6:
-                self.speed = 6
-            if self.rect.bottom <= 400:
-                self.rect.y += int(self.speed)
+            self.speed += 0.3
+            if self.speed > 4.4:
+                self.speed = 4.4
+            if self.rect.bottom < 400:
+                self.rect.y += self.speed
                 #animate()
 
         if not gameOver:
