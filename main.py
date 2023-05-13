@@ -1,19 +1,22 @@
-from pydoc import cli
+from glob import glob
+from turtle import screensize
 import pygame
+import json
 import os
 import random
-
 
 def get_path(path):
     canonicalized_path = path.replace('/', os.sep).replace('\\', os.sep)
     return canonicalized_path
+#Entering username in a cli
 
 pygame.init()
 pygame.mixer.init()
-
+name = input('Enter username: \n')
 pygame.display.set_caption("Flappy Bird")
 
-
+font = pygame.font.SysFont('couriernew', 20, True)
+DICT = {}
 FPS = 60
 SPEED = 2
 WIDTH = 288
@@ -34,7 +37,12 @@ bird_images = [pygame.image.load(get_path('sprites/yellowbird-midflap.png')), py
 pygame.image.load(get_path('sprites/yellowbird-downflap.png'))]
 game_over = pygame.image.load(get_path('sprites/gameover.png'))
 BACKGROUND = pygame.image.load(get_path('sprites/background-day.png'))
-        
+
+
+game_start = pygame.image.load(get_path('sprites/message.png'))
+hit = pygame.mixer.Sound(get_path('audio/hit.ogg'))
+die = pygame.mixer.Sound(get_path('audio/die.ogg'))   
+
 #Bird class with animation, gravity and jumping
 class Bird(pygame.sprite.Sprite):
     def __init__(self, x, y, images):
@@ -48,7 +56,6 @@ class Bird(pygame.sprite.Sprite):
         self.image = self.sprites[self.current_sprite]
         self.rect = self.image.get_rect()
         self.rect.center = [x, y]
-
         self.speed = 0
         self.start = False
 
@@ -80,7 +87,9 @@ class Bird(pygame.sprite.Sprite):
         else: 
             self.image = pygame.transform.rotate(self.sprites[int(self.current_sprite)], -70)
        
-
+def getScore():
+    global scoreCnt
+    return scoreCnt
 class Ground(pygame.sprite.Sprite): #Ground class with scrolling animation
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
@@ -111,7 +120,6 @@ class Pipe(pygame.sprite.Sprite):
         if self.rect.right < 0:
             self.kill()
 
-
 def scoreCounter(bird, pipe):
     if len(pipe) > 0:
         global scoreCnt, passPipe
@@ -129,32 +137,42 @@ def scoreCounter(bird, pipe):
                 pygame.mixer.Sound.play(point)
                 scoreCnt += 1
                 passPipe = False
-        scoreString = str(scoreCnt)
-        num_width = 0
-        cnt = len(scoreString)
-        for i in scoreString:
-            k = int(i)
-            scores = pygame.image.load(get_path(f'sprites/{k}.png'))
-            num_width += scores.get_width()
-        for i in scoreString:
-            k = int(i)
-            cnt -= 1
-            scores = pygame.image.load(get_path(f'sprites/{k}.png'))
-            SCREEN.blit(scores, ((WIDTH)/2 - cnt*(num_width //len(scoreString)), 60))
+       
+def scoreToImg(scores, y):
+    scoreString = str(scores)
+    num_width = 0
+    cnt = len(scoreString)
+    for i in scoreString:
+        k = int(i)
+        scores = pygame.image.load(get_path(f'sprites/{k}.png'))
+        num_width += scores.get_width()
+    for i in scoreString:
+        k = int(i)
+        cnt -= 1
+        scores = pygame.image.load(get_path(f'sprites/{k}.png'))
+        SCREEN.blit(scores, ((WIDTH)/2 - cnt*(num_width //len(scoreString)), y))
             
-            
-game_start = pygame.image.load(get_path('sprites/message.png'))
-hit = pygame.mixer.Sound(get_path('audio/hit.ogg'))
-die = pygame.mixer.Sound(get_path('audio/die.ogg'))
 
-def start_menu():
+def start_menu(ground):
+
+    ground.draw(SCREEN)
+    highScore = DICT["Highscore"]
+    bestScore = font.render('Best score', True, (255,255,255))
+    scoreToImg(highScore, 60)
+    SCREEN.blit(bestScore, ((WIDTH - bestScore.get_width())//2, 20))
+    SCREEN.blit(game_start,((WIDTH - game_start.get_width())//2, (HEIGHT - game_start.get_height())//2))     
     
-    SCREEN.blit(game_start, (50, 50))
+    userText = font.render(f'{name}\'s highest score', True, (255,255,255))
+    userScore = DICT[name]
+    scoreToImg(userScore, 450)
+    SCREEN.blit(userText, ((WIDTH - userText.get_width())//2, 420))
+
+    pygame.display.flip()
 
 def game_reset():
-    global clicked, gameOver,stopSound, scoreCnt 
+    global clicked, gameOver,stopSound, scoreCnt
     clicked, gameOver,stopSound, scoreCnt = False, False, False, 0
-    
+
 #variable, that would stop the 'hit' and 'die' sounds
 
 def dieSound():
@@ -172,9 +190,12 @@ def main():
     bird = pygame.sprite.GroupSingle()
     bird.add(Bird(50, int(HEIGHT/2), bird_images))
     global gameOver, clicked
-    
+    global DICT 
+    global name 
+    DICT = {}
     while True:
-       
+        with open('players_data.json', 'r') as player_data:
+            DICT = json.loads(player_data.read()) 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -186,23 +207,32 @@ def main():
                     game_reset()
                     main()
         SCREEN.blit(BACKGROUND, (0, 0))
+        
+        with open('players_data.json', 'w') as player_data:
+                if scoreCnt > DICT["Highscore"]:
+                    DICT["Highscore"] = scoreCnt
+                if name not in DICT:
+                    DICT[name] = scoreCnt
+                if name in DICT:
+                    if scoreCnt > DICT[name]:
+                        DICT[name] = scoreCnt
+                data = json.dumps(DICT, indent = 4)
+                player_data.write(data)
+
         if not clicked:
-            
-            SCREEN.blit(game_start,((WIDTH - game_start.get_width())//2, (HEIGHT - game_start.get_height())//2))     
-            pygame.display.flip()
+            start_menu(ground)
         
         else:
-            
-        
             
             pipe.draw(SCREEN)
             bird.draw(SCREEN)
             bird.update()
             ground.draw(SCREEN)
             ground.update()
-            print(scoreCnt)
+            scoreToImg(scoreCnt, 60)
             scoreCounter(bird, pipe)
             
+
             if not gameOver and clicked:
                 time_now = pygame.time.get_ticks()
                 if time_now - last_pip > pipe_freq:
@@ -210,8 +240,11 @@ def main():
                     pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1))
                     pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1))
                     last_pip = time_now
-                pipe.update()
                 
+                pipe.update()
+
+            
+
             ground_collision = pygame.sprite.spritecollide(bird.sprites()[0], ground, False)
             pipe_collision = pygame.sprite.spritecollide(bird.sprites()[0], pipe, False)
 
@@ -222,6 +255,7 @@ def main():
                 
             
             if ground_collision or pipe_collision:
+                
                 dieSound()
                 gameOver = True
                 SCREEN.blit(game_over, ((WIDTH - game_over.get_width())//2, (HEIGHT - game_over.get_height())//2))
