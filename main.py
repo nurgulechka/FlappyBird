@@ -36,7 +36,7 @@ passPipe = False
 stopSound = False
 scoreCnt = 0
 pipe_dist = 130
-pipe_freq = 1500
+pipe_freq = 1800
 color = 'yellow'
 mode = 'day'
 pipe_color = 'green'
@@ -93,8 +93,8 @@ class Bird(pygame.sprite.Sprite):
     
         if clicked:
             self.speed += 0.4
-            if self.speed > 5:
-                self.speed = 5
+            if self.speed > 6:
+                self.speed = 6
             if self.rect.bottom <= 400:
                 self.rect.y += int(self.speed)
                 #animate()
