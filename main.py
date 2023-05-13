@@ -2,7 +2,7 @@ import pygame
 import json
 import os
 import random
-
+from database import *
 #get path in any OS
 def get_path(path):
     canonicalized_path = path.replace('/', os.sep).replace('\\', os.sep)
@@ -30,6 +30,7 @@ clock = pygame.time.Clock()
 
 #defining game's variable
 clicked = False
+view = False
 gameOver = False
 passPipe = False
 stopSound = False
@@ -185,19 +186,18 @@ def scoreToImg(scores, y):
 #and when bird dies, after pressing space
 def start_menu(ground, bird):
     ground.draw(SCREEN)
-    highScore = DICT["Highscore"]
     bestScore = font.render('Best score', True, (255,255,255))
-    scoreToImg(highScore, 60)
-    
+    scoreToImg(get_best_score(), 60)
     SCREEN.blit(bestScore, ((WIDTH - bestScore.get_width())//2, 20))
     SCREEN.blit(game_start,((WIDTH - game_start.get_width())//2, (HEIGHT - game_start.get_height())//2))     
     userText = font.render(f'{name}\'s highest score', True, (255,255,255))
-    userScore = DICT[name]
+    userScore = get_current_result(name)
     scoreToImg(userScore, 450)
     SCREEN.blit(userText, ((WIDTH - userText.get_width())//2, 420))
     bird.update()
     bird.draw(SCREEN)
-    
+    top_result = font.render('Press t to view Top-5', True, (255,255,255))
+    SCREEN.blit(top_result, ((WIDTH - top_result.get_width())//2, 485))
     pygame.display.flip()
 
 #function that resets game variables, 
@@ -214,9 +214,26 @@ def dieSound():
         pygame.mixer.Sound.play(die, 0)
         stopSound = True
 
+#retrieving top 5 players from database
+def top_players():
+    #ground.draw(SCREEN)
+    players = top_five()
+    cnt = 0
+    height = 50
+    for player in players:
+        cnt += 1
+        height += 40
+        name_ = font.render(player[0], True, (255, 255, 255))
+        SCREEN.blit(name_, (int(WIDTH//2) - name_.get_width() -30, height))
+        scoreToImg(player[1], height)
+       
+        #print(player[0], player[1])
+
+    #print()
+
 #main functions that executes
 def main():
-    global gameOver, clicked, DICT, name, color, mode, pipe_color
+    global gameOver, clicked, DICT, name, color, mode, pipe_color, view
     last_pip = pygame.time.get_ticks() - pipe_freq
     bird = pygame.sprite.GroupSingle()
     bird.add(Bird(int(WIDTH//2), int(HEIGHT/2) + 47, color))
@@ -224,18 +241,22 @@ def main():
     ground.add(Ground())
     pipe = pygame.sprite.Group()
     DICT = {}     
-    
+    create_table()
+    top_five()
+    """
+    with open('players_data.json', 'r') as player_data:
+        DICT = json.loads(player_data.read()) 
+    get_current_result(str(name))
+    """
     #while loop for game running
-    while True:
-        with open('players_data.json', 'r') as player_data:
-            DICT = json.loads(player_data.read()) 
- 
+    while True: 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
                   
                 if event.key == pygame.K_SPACE and not gameOver:
+                    view = False
                     clicked = True
                     bird.sprites()[0].jump()
                 #changing bird colors
@@ -255,28 +276,41 @@ def main():
                     pipe_color = "green"  
                 if event.key == pygame.K_p and not gameOver:
                     pipe_color = "red" 
-                 
+                if event.key == pygame.K_t and not gameOver:
+                    view = not view
                 if event.key == pygame.K_SPACE and gameOver:
+                    #save_results(name, scoreCnt)
                     game_reset()
                     main()
         
         SCREEN.blit(backgrMode(mode), (0, 0))
         
+        if not check_row(name):
+            new_row(str(name), scoreCnt)
+            
+        elif scoreCnt > get_current_result(name):
+            save_results(str(name), scoreCnt)
+        """
         with open('players_data.json', 'w') as player_data:
                 if scoreCnt > DICT["Highscore"]:
                     DICT["Highscore"] = scoreCnt
                 if name not in DICT:
                     DICT[name] = scoreCnt
+                    new_row(str(name), int(DICT[name]))
                 if name in DICT:
                     if scoreCnt > DICT[name]:
                         DICT[name] = scoreCnt
+                        save_results(str(name), int(DICT[name]))
                 data = json.dumps(DICT, indent = 4)
                 player_data.write(data)
-        
-       
-        if not clicked:
+        """   
+        if view:
+            top_players()     
+        if not clicked and not view:
+            #top_players()
             start_menu(ground, bird)
         else:
+            
             pipe.draw(SCREEN)
             bird.update()
             bird.draw(SCREEN)
@@ -288,10 +322,10 @@ def main():
             if not gameOver and clicked:
                 time_now = pygame.time.get_ticks()
                 if time_now - last_pip > pipe_freq:
-                    pipeheight = random.randint(-100, 70)
-                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1, pipe_color))
-                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1, pipe_color))
-                    last_pip = time_now      
+                        pipeheight = random.randint(-100, 70)
+                        pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1, pipe_color))
+                        pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1, pipe_color))
+                        last_pip = time_now      
                 pipe.update()
            
             if bird.sprites()[0].rect.bottom >= 500 or bird.sprites()[0].rect.top < 0:  
