@@ -1,29 +1,34 @@
-from glob import glob
-from turtle import screensize
 import pygame
 import json
 import os
 import random
 
+#get path in any OS
 def get_path(path):
     canonicalized_path = path.replace('/', os.sep).replace('\\', os.sep)
     return canonicalized_path
-#Entering username in a cli
 
 pygame.init()
 pygame.mixer.init()
-name = input('Enter username: \n')
-pygame.display.set_caption("Flappy Bird")
 
-font = pygame.font.SysFont('couriernew', 20, True)
+#Entering username in a cli
+name = input('Enter username: \n')
+
+#creating constants
 DICT = {}
 FPS = 60
 SPEED = 2
 WIDTH = 288
 HEIGHT = 512
-clock = pygame.time.Clock()
+
+#defining the screen and fonts
+pygame.display.set_caption("Flappy Bird")
+font = pygame.font.SysFont('couriernew', 20, True)
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
 
+clock = pygame.time.Clock()
+
+#defining game's variable
 clicked = False
 gameOver = False
 passPipe = False
@@ -31,27 +36,42 @@ stopSound = False
 scoreCnt = 0
 pipe_dist = 130
 pipe_freq = 1500
+color = 'yellow'
+mode = 'day'
+pipe_color = 'green'
 
-
-bird_images = [pygame.image.load(get_path('sprites/yellowbird-midflap.png')), pygame.image.load(get_path('sprites/yellowbird-upflap.png')),
-pygame.image.load(get_path('sprites/yellowbird-downflap.png'))]
+#loading images
 game_over = pygame.image.load(get_path('sprites/gameover.png'))
-BACKGROUND = pygame.image.load(get_path('sprites/background-day.png'))
-
-
 game_start = pygame.image.load(get_path('sprites/message.png'))
+
+#functions to get different colored birds
+def setBirdImg(color):
+    return [pygame.image.load(get_path(f'sprites/{color}bird-midflap.png')), pygame.image.load(get_path(f'sprites/{color}bird-upflap.png')),
+    pygame.image.load(get_path(f'sprites/{color}bird-downflap.png'))]
+
+#functions to get different colored pipes
+def setPipeImg(pipecolor):
+    return pygame.image.load(get_path(f'sprites/pipe-{pipe_color}.png'))
+
+#functions to get background(night or day)
+def backgrMode(mode):
+    return pygame.image.load(get_path(f"sprites/background-{mode}.png"))
+
+
+#defining sounds 
 hit = pygame.mixer.Sound(get_path('audio/hit.ogg'))
 die = pygame.mixer.Sound(get_path('audio/die.ogg'))   
 
+
 #Bird class with animation, gravity and jumping
 class Bird(pygame.sprite.Sprite):
-    def __init__(self, x, y, images):
+    def __init__(self, x, y, color):
         pygame.sprite.Sprite.__init__(self)
         #self.images = images
         #self.cnt = 0
         #self.index = -1
         #self.image = pygame.image.load(get_path('sprites/yellowbird-downflap.png'))
-        self.sprites = images
+        self.sprites = setBirdImg(color)
         self.current_sprite = -1
         self.image = self.sprites[self.current_sprite]
         self.rect = self.image.get_rect()
@@ -79,7 +99,7 @@ class Bird(pygame.sprite.Sprite):
                 #animate()
 
         if not gameOver:
-            self.current_sprite += 0.3
+            self.current_sprite += 0.2
             if self.current_sprite >= len(self.sprites):
                 self.current_sprite = 0
             self.image = self.sprites[int(self.current_sprite)] 
@@ -90,43 +110,50 @@ class Bird(pygame.sprite.Sprite):
 def getScore():
     global scoreCnt
     return scoreCnt
-class Ground(pygame.sprite.Sprite): #Ground class with scrolling animation
+
+#Ground class with scrolling animation
+class Ground(pygame.sprite.Sprite): 
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load(get_path('sprites/base.png'))
         self.rect = self.image.get_rect()
         self.rect.x = 0
         self.rect.y = 400
+    #when updated, ground starts scrolling    
     def update(self):
         if not gameOver:
             self.rect.x -= SPEED
             if self.rect.x < - 25:    
                 self.rect.x = 0
 
-
 #Pipe class, that creates upper and lower pipes     
 class Pipe(pygame.sprite.Sprite):
-    def __init__(self, x, y, pos):
+    def __init__(self, x, y, pos, color):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load(get_path('sprites/pipe-green.png'))
+        self.image = setPipeImg(color)
         self.rect = self.image.get_rect()
-        if pos == 1:
+        #bottom pipe
+        if pos == 1: 
             self.image = pygame.transform.flip(self.image, False, True)
             self.rect.bottomleft = [x, y - pipe_dist/2]
+        #upper pipe
         if pos == -1:
             self.rect.topleft = [x, y + pipe_dist/2]
+
+    #pipe's scrolling when updated
     def update(self):
-        self.rect[0] -= SPEED
-        if self.rect.right < 0:
+        self.rect[0] -= SPEED   #moves to the left by x coordinate
+        if self.rect.right < 0: 
             self.kill()
 
+#functions that counts the score
 def scoreCounter(bird, pipe):
     if len(pipe) > 0:
         global scoreCnt, passPipe
         bird_left, pipe_left = bird.sprites()[0].rect.left, pipe.sprites()[0].rect.left
         bird_right, pipe_right = bird.sprites()[0].rect.right, pipe.sprites()[0].rect.right
-        #conditions to check, in order to consider that bird is passed the pipe
 
+        #conditions to check, in order to consider that bird is passed the pipe
         if bird_left > pipe_left and bird_right < pipe_right and not passPipe:
             passPipe = True
 
@@ -137,7 +164,8 @@ def scoreCounter(bird, pipe):
                 pygame.mixer.Sound.play(point)
                 scoreCnt += 1
                 passPipe = False
-       
+
+#functions that converts scores to image      
 def scoreToImg(scores, y):
     scoreString = str(scores)
     num_width = 0
@@ -152,29 +180,33 @@ def scoreToImg(scores, y):
         scores = pygame.image.load(get_path(f'sprites/{k}.png'))
         SCREEN.blit(scores, ((WIDTH)/2 - cnt*(num_width //len(scoreString)), y))
             
-
-def start_menu(ground):
-
+#function for the starting menu, 
+#it appears at the beginning, 
+#and when bird dies, after pressing space
+def start_menu(ground, bird):
     ground.draw(SCREEN)
     highScore = DICT["Highscore"]
     bestScore = font.render('Best score', True, (255,255,255))
     scoreToImg(highScore, 60)
+    
     SCREEN.blit(bestScore, ((WIDTH - bestScore.get_width())//2, 20))
     SCREEN.blit(game_start,((WIDTH - game_start.get_width())//2, (HEIGHT - game_start.get_height())//2))     
-    
     userText = font.render(f'{name}\'s highest score', True, (255,255,255))
     userScore = DICT[name]
     scoreToImg(userScore, 450)
     SCREEN.blit(userText, ((WIDTH - userText.get_width())//2, 420))
-
+    bird.update()
+    bird.draw(SCREEN)
+    
     pygame.display.flip()
 
+#function that resets game variables, 
+#so that it would start again
 def game_reset():
     global clicked, gameOver,stopSound, scoreCnt
     clicked, gameOver,stopSound, scoreCnt = False, False, False, 0
 
-#variable, that would stop the 'hit' and 'die' sounds
-
+#functions, that plays the sound once with stopSound variable
 def dieSound():
     global stopSound
     if gameOver and not stopSound:
@@ -182,31 +214,53 @@ def dieSound():
         pygame.mixer.Sound.play(die, 0)
         stopSound = True
 
+#main functions that executes
 def main():
+    global gameOver, clicked, DICT, name, color, mode, pipe_color
     last_pip = pygame.time.get_ticks() - pipe_freq
+    bird = pygame.sprite.GroupSingle()
+    bird.add(Bird(int(WIDTH//2), int(HEIGHT/2) + 47, color))
     ground = pygame.sprite.Group()
     ground.add(Ground())
     pipe = pygame.sprite.Group()
-    bird = pygame.sprite.GroupSingle()
-    bird.add(Bird(50, int(HEIGHT/2), bird_images))
-    global gameOver, clicked
-    global DICT 
-    global name 
-    DICT = {}
+    DICT = {}     
+    
+    #while loop for game running
     while True:
         with open('players_data.json', 'r') as player_data:
             DICT = json.loads(player_data.read()) 
+ 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
+                  
                 if event.key == pygame.K_SPACE and not gameOver:
                     clicked = True
                     bird.sprites()[0].jump()
+                #changing bird colors
+                if event.key == pygame.K_r and not gameOver:
+                    bird.sprite.sprites = setBirdImg("red")
+                if event.key == pygame.K_b and not gameOver:
+                    bird.sprite.sprites = setBirdImg("blue")
+                if event.key == pygame.K_y and not gameOver:
+                    bird.sprite.sprites = setBirdImg("yellow")
+                #changing to night/day mode
+                if event.key == pygame.K_n and not gameOver:
+                    mode = "night"
+                if event.key == pygame.K_d and not gameOver:
+                    mode = "day"  
+                #changing pipes' colors
+                if event.key == pygame.K_g and not gameOver:
+                    pipe_color = "green"  
+                if event.key == pygame.K_p and not gameOver:
+                    pipe_color = "red" 
+                 
                 if event.key == pygame.K_SPACE and gameOver:
                     game_reset()
                     main()
-        SCREEN.blit(BACKGROUND, (0, 0))
+        
+        SCREEN.blit(backgrMode(mode), (0, 0))
         
         with open('players_data.json', 'w') as player_data:
                 if scoreCnt > DICT["Highscore"]:
@@ -218,44 +272,37 @@ def main():
                         DICT[name] = scoreCnt
                 data = json.dumps(DICT, indent = 4)
                 player_data.write(data)
-
-        if not clicked:
-            start_menu(ground)
         
+       
+        if not clicked:
+            start_menu(ground, bird)
         else:
-            
             pipe.draw(SCREEN)
-            bird.draw(SCREEN)
             bird.update()
+            bird.draw(SCREEN)
             ground.draw(SCREEN)
             ground.update()
-            scoreToImg(scoreCnt, 60)
             scoreCounter(bird, pipe)
+            scoreToImg(scoreCnt, 60)
             
-
             if not gameOver and clicked:
                 time_now = pygame.time.get_ticks()
                 if time_now - last_pip > pipe_freq:
-                    pipeheight = random.randint(-50, 50)
-                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1))
-                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1))
-                    last_pip = time_now
-                
+                    pipeheight = random.randint(-100, 70)
+                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight, -1, pipe_color))
+                    pipe.add(Pipe(WIDTH, HEIGHT / 2 + pipeheight , 1, pipe_color))
+                    last_pip = time_now      
                 pipe.update()
-
-            
-
-            ground_collision = pygame.sprite.spritecollide(bird.sprites()[0], ground, False)
-            pipe_collision = pygame.sprite.spritecollide(bird.sprites()[0], pipe, False)
-
+           
             if bird.sprites()[0].rect.bottom >= 500 or bird.sprites()[0].rect.top < 0:  
                 pygame.mixer.Sound.play(hit)
                 pygame.mixer.Sound.play(die) 
                 gameOver = True
-                
-            
-            if ground_collision or pipe_collision:
-                
+
+            ground_collision = pygame.sprite.spritecollide(bird.sprites()[0], ground, False)
+            pipe_collision = pygame.sprite.spritecollide(bird.sprites()[0], pipe, False)
+   
+            if ground_collision or pipe_collision:  
                 dieSound()
                 gameOver = True
                 SCREEN.blit(game_over, ((WIDTH - game_over.get_width())//2, (HEIGHT - game_over.get_height())//2))
@@ -263,8 +310,6 @@ def main():
             clock.tick(FPS)
             pygame.display.flip()
 main()
-
-
 
 
     
